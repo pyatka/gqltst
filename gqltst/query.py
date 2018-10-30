@@ -1,5 +1,5 @@
 import copy
-
+from gqltst.reslovers import connection_first_resolver, connection_last_resolver
 
 class QueryData(object):
     def __init__(self):
@@ -27,7 +27,17 @@ class TestQuery(object):
         for key, var in self.query_data.variables.items():
             path = self._get_path_from_key(key)
 
-            var["resolver"] = self._get_dict_by_path([*path, var["key"]], args)
+            var["resolver"] = None
+
+            if tested_object.is_connection and tested_object.name == var["path"].split("_").pop():
+                if var["key"] == "first":
+                    var["resolver"] = connection_first_resolver
+                elif var["key"] == "last":
+                    var["resolver"] = connection_last_resolver
+
+            if var["resolver"] is None:
+                var["resolver"] = self._get_dict_by_path([*path, var["key"]], args)
+
             if var["resolver"] is None:
                 if var["node"].type in scalars.keys():
                     var["resolver"] = scalars[var["node"].type].resolve
@@ -68,7 +78,9 @@ class TestQuery(object):
 
     def _get_variables(self, i, context={}):
         for res in list(self.query_data.variables.values())[i]["resolver"](context):
-            context[list(self.query_data.variables.keys())[i]] = res
+            if "vars" not in context.keys():
+                context["vars"] = {}
+            context["vars"][list(self.query_data.variables.keys())[i]] = res
             if len(self.query_data.variables.values()) > i + 1:
                 for r in self._get_variables(i+1, copy.deepcopy(context)):
                     if type(r) is list:

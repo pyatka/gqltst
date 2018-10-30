@@ -1,7 +1,7 @@
 import requests
 import copy
 from gqltst.query import TestQuery, QueryData
-from gqltst.types import SCALAR_TYPES
+from gqltst.types import SCALAR_TYPES, ValidationResult
 
 structure_query = """
 query IntrospectionQuery {
@@ -88,17 +88,38 @@ class Node(object):
         self.is_connection = False
 
     def validate(self, data, scalars={}):
-        if self.kind == "SCALAR":
-            return scalars[self.type].validate(data)
-        else:
-            if self.is_list:
-                for value in data:
-                    for key, item in value.items():
-                        return self.fields[key].validate(value[key], scalars)
+        if self.is_list:
+            if type(data) is not list:
+                return [ValidationResult("Field %s must be list" % (self.name), self, data)]
             else:
-                for key, item in data.items():
-                    return self.fields[key].validate(data[key], scalars)
-        return True
+                errors = []
+
+                self.is_list = False
+                for d in data:
+                    validation_result = self.validate(d, scalars)
+                    if len(validation_result) > 0:
+                        errors.extend(validation_result)
+                self.is_list = True
+                return errors
+        else:
+            if self.kind == "SCALAR":
+                if scalars[self.type].validate(data):
+                    return []
+                else:
+                    return [ValidationResult("Field %s: %s type validation error, received data: %s" % (self.name, self.type, data), self, data)]
+            else:
+                errors = []
+
+                if data is None:
+                    if self.non_null:
+                        errors.append(ValidationResult("Field %s: %s must not be NULL" % (self.name, self.type), self, data))
+                else:
+                    for key, item in data.items():
+                        validation_result = self.fields[key].validate(item, scalars)
+                        if len(validation_result) > 0:
+                            errors.extend(validation_result)
+
+                return errors
 
     def get_query(self, query_data=None):
         if query_data is None:
@@ -247,9 +268,12 @@ class Schema(object):
             for query, values in test.get_query(self.scalars, args=args, validators=validators):
                 result = requests.get(self.url, params={"query": query})
                 if result.status_code == 200:
-                    print(" test #%s" % test_iteration)
+                    print(" test #%s" % test_iteration, values)
                     response_data = result.json()
-                    self.validate_response(response_data["data"])
+                    errors = self.validate_response(response_data["data"])
+                    if len(errors) > 0:
+                        print(query)
+                    print([str(r) for r in errors])
                 else:
                     print(query, values)
 

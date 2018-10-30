@@ -11,8 +11,7 @@ class BaseResolver(object):
         pass
 
     def validate(self, data):
-        print(data)
-        return True
+        return False
 
 
 class StringResolver(BaseResolver):
@@ -22,6 +21,12 @@ class StringResolver(BaseResolver):
 
     def escape(self, value):
         return "\"%s\"" % (str(value))
+
+    def validate(self, data):
+        if data is None:
+            return True
+
+        return type(data) == str
 
 
 class DateTimeResolver(BaseResolver):
@@ -34,13 +39,41 @@ class DateTimeResolver(BaseResolver):
     def escape(self, value):
         return "\"%s\"" % (str(value))
 
+    def validate(self, data):
+        if data is None:
+            return True
+
+        return type(data) == str
+
 
 class IntResolver(BaseResolver):
     def resolve(self, context):
         yield random.randint(1, 10)
 
     def escape(self, value):
-        return int(value)
+        if value is not None:
+            return int(value)
+        return value
+
+    def validate(self, data):
+        if data is None:
+            return True
+
+        return type(data) == int
+
+
+class FloatResolver(BaseResolver):
+    def resolve(self, context):
+        yield random.randint(1, 10)
+
+    def escape(self, value):
+        return float(value)
+
+    def validate(self, data):
+        if data is None:
+            return True
+
+        return type(data) == float
 
 
 class BooleanResolver(BaseResolver):
@@ -53,9 +86,29 @@ class BooleanResolver(BaseResolver):
         else:
             return "false"
 
+    def validate(self, data):
+        return type(data) == bool
+
+
+class ValidationResult(object):
+    def __init__(self, error=None, node=None, data=None):
+        if error is None:
+            self.success = True
+            self.error = None
+        else:
+            self.success = False
+            self.error = error
+
+        self.node = node
+        self.data = data
+
+    def __str__(self):
+        return "%s" % (str(self.error))
+
 SCALAR_TYPES = {
     "String": StringResolver,
     "DateTime": DateTimeResolver,
     "Boolean": BooleanResolver,
+    "Float": FloatResolver,
     "Int": IntResolver,
 }
