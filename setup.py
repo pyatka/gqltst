@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="gqltst",
-    version="0.0.1",
+    version="0.0.3",
     author="Andrey Mazur",
     author_email="pyatka.aag@gmail.com",
     description="Framework for automatic GraphQL testing",

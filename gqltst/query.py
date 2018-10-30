@@ -36,7 +36,9 @@ class TestQuery(object):
                     var["resolver"] = connection_last_resolver
 
             if var["resolver"] is None:
-                var["resolver"] = self._get_dict_by_path([*path, var["key"]], args)
+                next_path = copy.deepcopy(path)
+                next_path.append(var["key"])
+                var["resolver"] = self._get_dict_by_path(next_path, args)
 
             if var["resolver"] is None:
                 if var["node"].type in scalars.keys():
@@ -84,7 +86,9 @@ class TestQuery(object):
             if len(self.query_data.variables.values()) > i + 1:
                 for r in self._get_variables(i+1, copy.deepcopy(context)):
                     if type(r) is list:
-                        yield [res, *r]
+                        nr = [res]
+                        nr.extend(r)
+                        yield nr
                     else:
                         yield [res, r]
             else:
