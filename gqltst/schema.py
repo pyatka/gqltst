@@ -77,7 +77,8 @@ fragment TypeRef on __Type {
 
 
 class Node(object):
-    def __init__(self):
+    def __init__(self, path=[]):
+        self.path = path
         self.fields = {}
         self.args = {}
         self.name = ""
@@ -87,26 +88,28 @@ class Node(object):
         self.is_list = False
         self.is_connection = False
 
-    def validate(self, data, scalars={}):
+    def validate(self, data, scalars={}, validators={}):
+        validation_result = []
+
         if self.is_list:
             if type(data) is not list:
-                return [ValidationResult("Field %s must be list" % (self.name), self, data)]
+                validation_result = [ValidationResult("Field %s must be list" % (self.name), self, data)]
             else:
                 errors = []
 
                 self.is_list = False
                 for d in data:
-                    validation_result = self.validate(d, scalars)
+                    validation_result = self.validate(d, scalars, validators)
                     if len(validation_result) > 0:
                         errors.extend(validation_result)
                 self.is_list = True
-                return errors
+                validation_result = errors
         else:
             if self.kind == "SCALAR":
                 if scalars[self.type].validate(data):
-                    return []
+                    validation_result = []
                 else:
-                    return [ValidationResult("Field %s: %s type validation error, received data: %s" % (self.name, self.type, data), self, data)]
+                    validation_result = [ValidationResult("Field %s: %s type validation error, received data: %s" % (self.name, self.type, data), self, data)]
             else:
                 errors = []
 
@@ -115,11 +118,17 @@ class Node(object):
                         errors.append(ValidationResult("Field %s: %s must not be NULL" % (self.name, self.type), self, data))
                 else:
                     for key, item in data.items():
-                        validation_result = self.fields[key].validate(item, scalars)
+                        validation_result = self.fields[key].validate(item, scalars, validators)
                         if len(validation_result) > 0:
                             errors.extend(validation_result)
 
-                return errors
+                validation_result = errors
+
+        if ".".join(self.path) in validators.keys():
+            for func in validators[".".join(self.path)]:
+                validation_result.extend(func(data, self))
+
+        return validation_result
 
     def get_query(self, query_data=None):
         if query_data is None:
@@ -184,8 +193,8 @@ class Node(object):
             return "%s\r\n%s" % ("%s (%s) : %s" % (self.name, args, otype), "".join(["%s%s" % ("    " * iteration, f.__str__(iteration + 1)) for k, f in self.fields.items()]))
 
 
-def node_from_data(data, types_cache):
-    new_node = Node()
+def node_from_data(data, types_cache, path=[]):
+    new_node = Node(path)
     object_data = None
 
     if data["type"]["kind"] == "OBJECT":
@@ -206,6 +215,7 @@ def node_from_data(data, types_cache):
     new_node.name = data["name"]
     new_node.kind = object_data["kind"]
     new_node.type = object_data["name"]
+    new_node.path.append(new_node.name)
 
     if "args" in data.keys() and data["args"] is not None:
         is_connection = "fields" in object_data.keys() and object_data["fields"] is not None and "pageInfo" in [f["name"] for f in object_data["fields"]]
@@ -216,14 +226,14 @@ def node_from_data(data, types_cache):
             if is_connection and arg["name"] in ["before", "after"]:
                 pass
             else:
-                new_node.args[arg["name"]] = node_from_data(arg, types_cache)
+                new_node.args[arg["name"]] = node_from_data(arg, types_cache, copy.deepcopy(new_node.path))
 
     if "fields" in object_data.keys() and object_data["fields"] is not None:
         for field in object_data["fields"]:
             if field["name"] == "id" and field["type"]["ofType"]["name"] == "ID":
                 pass
             else:
-                new_node.fields[field["name"]] = node_from_data(field, types_cache)
+                new_node.fields[field["name"]] = node_from_data(field, types_cache, copy.deepcopy(new_node.path))
 
     return new_node
 
@@ -270,7 +280,7 @@ class Schema(object):
                 if result.status_code == 200:
                     print(" test #%s" % test_iteration, values)
                     response_data = result.json()
-                    errors = self.validate_response(response_data["data"])
+                    errors = self.validate_response(response_data["data"], validators)
                     if len(errors) > 0:
                         print(query)
                     print([str(r) for r in errors])
@@ -279,7 +289,7 @@ class Schema(object):
 
                 test_iteration += 1
 
-    def validate_response(self, response_data):
+    def validate_response(self, response_data, validators):
         for key in response_data.keys():
             tested_obj = self.schema_objects[key]
-            return tested_obj.validate(response_data[key], self.scalars)
+            return tested_obj.validate(response_data[key], self.scalars, validators)
