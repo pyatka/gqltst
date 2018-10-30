@@ -13,6 +13,8 @@ Prepare your schema
 ```
 There're already prepared resolvers for Integer, String, Boolean, DateTime and Float, but you can register own resolver for your scalars.
 ```python
+    from gqltst.types import BaseResolver
+    
     class YourResolver(BaseResolver):  
 	    def resolve(self, context):  
 	        yield "Hello world"
@@ -27,6 +29,10 @@ There're already prepared resolvers for Integer, String, Boolean, DateTime and F
 ```
 Start test with own parameter resolvers
 ```python
+    from gqltst.reslovers import range_resolver, depend_resolver
+    from datetime import datetime, timedelta
+    from gqltst.types import ValidationResult
+    
     def date_resolver(context):
         now_date = datetime.now()
         for generated_date in [(now_date - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
