@@ -1,5 +1,6 @@
 import requests
 import copy
+import json
 from gqltst.query import TestQuery, QueryData
 from gqltst.types import SCALAR_TYPES, ValidationResult
 
@@ -276,6 +277,7 @@ class Schema(object):
                 self.test_queries.append(TestQuery(query, data, self.schema_objects))
 
     def test(self, args={}, validators={}):
+        test_errors_save_data = {}
         self.prepare_test_queries()
         for test in self.test_queries:
             test_query_path = ".".join(test.query_data.path)
@@ -285,19 +287,42 @@ class Schema(object):
             for query, values in test.get_query(self.scalars, args=args, validators=validators):
                 result = requests.get(self.url, params={"query": query})
                 if result.status_code == 200:
-                    if failed_tests > 0:
-                        print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration), end='\r', flush=True)
-                    else:
-                        print("Test %s (%s)" % (test_query_path, test_iteration), end='\r', flush=True)
                     response_data = result.json()
                     errors = self.validate_response(response_data["data"], validators)
 
                     if len(errors) > 0:
                         failed_tests += 1
+                        if test_query_path not in test_errors_save_data.keys():
+                            test_errors_save_data[test_query_path] = []
+
+                        test_errors_save_data[test_query_path].append({
+                            "values": values,
+                            "query": query,
+                            "response": result,
+                            "errors": [str(r) for r in errors],
+                        })
+
+                    if failed_tests > 0:
+                        print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration), end='\r',
+                              flush=True)
+                    else:
+                        print("Test %s (%s)" % (test_query_path, test_iteration), end='\r', flush=True)
                     #     print(query)
                     # print([str(r) for r in errors])
                 else:
-                    print(query, values)
+                    failed_tests += 1
+                    if test_query_path not in test_errors_save_data.keys():
+                        test_errors_save_data[test_query_path] = []
+
+                    test_errors_save_data[test_query_path].append({
+                        "values": values,
+                        "query": query,
+                        "response": result.text,
+                        "respose_code": result.status_code,
+                    })
+
+                    print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration), end='\r',
+                          flush=True)
 
                 test_iteration += 1
 
@@ -305,6 +330,9 @@ class Schema(object):
                 print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration))
             else:
                 print("Test %s (%s/%s) - DONE" % (test_query_path, test_iteration, test_iteration))
+
+        with open("result.json", "w") as rf:
+            rf.write(json.dumps(test_errors_save_data))
 
     def validate_response(self, response_data, validators):
         for key in response_data.keys():
