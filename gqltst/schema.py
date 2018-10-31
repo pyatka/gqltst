@@ -277,10 +277,17 @@ class Schema(object):
                 self.test_queries.append(TestQuery(query, data, self.schema_objects))
 
     def test(self, args={}, validators={}):
-        test_errors_save_data = {}
+        test_save_data = {
+            "url": self.url,
+            "tests": [],
+        }
         self.prepare_test_queries()
         for test in self.test_queries:
             test_query_path = ".".join(test.query_data.path)
+            test_data = {
+                "path": test_query_path,
+                "queries": [],
+            }
             print("Test %s" % (test_query_path), end='\r', flush=True)
             test_iteration = 0
             failed_tests = 0
@@ -289,43 +296,50 @@ class Schema(object):
                 test_iteration += 1
                 result = requests.get(self.url, params={"query": query})
                 response_time.append(result.elapsed.total_seconds())
+                errors = []
                 if result.status_code == 200:
                     response_data = result.json()
                     errors = self.validate_response(response_data["data"], validators)
 
                     if len(errors) > 0:
                         failed_tests += 1
-                        if test_query_path not in test_errors_save_data.keys():
-                            test_errors_save_data[test_query_path] = []
-
-                        test_errors_save_data[test_query_path].append({
-                            "values": values,
-                            "query": query,
-                            "response": result.text,
-                            "errors": [str(r) for r in errors],
-                        })
 
                     if failed_tests > 0:
                         print("Test %s (%s/%s) [%0.2fs] - FAIL" % (test_query_path, failed_tests, test_iteration, sum(response_time)/len(response_time)), end='\r',
                               flush=True)
                     else:
                         print("Test %s (0/%s) [%0.2fs]" % (test_query_path, test_iteration, sum(response_time)/len(response_time)), end='\r', flush=True)
-                    #     print(query)
-                    # print([str(r) for r in errors])
                 else:
                     failed_tests += 1
-                    if test_query_path not in test_errors_save_data.keys():
-                        test_errors_save_data[test_query_path] = []
-
-                    test_errors_save_data[test_query_path].append({
-                        "values": values,
-                        "query": query,
-                        "response": result.text,
-                        "respose_code": result.status_code,
-                    })
-
                     print("Test %s (%s/%s) [%0.2fs] - FAIL" % (test_query_path, failed_tests, test_iteration, sum(response_time)/len(response_time)), end='\r',
                           flush=True)
+
+                test_query_data = {
+                    "query": query,
+                    "values": values,
+                    "errors": [str(r) for r in errors],
+                    "response": {
+                        "code": result.status_code,
+                        "data": None,
+                    },
+                    "time": result.elapsed.total_seconds(),
+                }
+
+                try:
+                    test_query_data["response"]["data"] = result.text
+                except:
+                    pass
+
+                test_data["queries"].append(test_query_data)
+
+            test_data["failed"] = failed_tests
+            test_data["total"] = test_iteration
+            test_data["time"] = {
+                "total": sum(response_time),
+                "average": sum(response_time)/len(response_time),
+            }
+
+            test_save_data["tests"].append(test_data)
 
             if failed_tests > 0:
                 print("Test %s (%s/%s) [average %0.2fs / total %0.2fs] - FAIL" % (test_query_path, test_iteration - failed_tests, test_iteration, sum(response_time)/len(response_time), sum(response_time)))
@@ -333,7 +347,7 @@ class Schema(object):
                 print("Test %s (%s/%s) [average %0.2fs / total %0.2fs] - DONE" % (test_query_path, test_iteration, test_iteration, sum(response_time)/len(response_time), sum(response_time)))
 
         with open("result.json", "w") as rf:
-            rf.write(json.dumps(test_errors_save_data))
+            rf.write(json.dumps(test_save_data))
 
         print("Check results in result.json")
 
