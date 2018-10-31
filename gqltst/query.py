@@ -1,10 +1,11 @@
 import copy
 from gqltst.reslovers import connection_first_resolver, connection_last_resolver
+from collections import OrderedDict
 
 class QueryData(object):
     def __init__(self):
         self.path = []
-        self.variables = {}
+        self.variables = OrderedDict()
 
     def get_var_name(self, key, node):
         var_name = "$%s_%s" % ("_".join([a for a in self.path]), key)
@@ -79,9 +80,10 @@ class TestQuery(object):
         return prepared_query
 
     def _get_variables(self, i, context={}):
+        if "vars" not in context.keys():
+            context["vars"] = OrderedDict()
+
         for res in list(self.query_data.variables.values())[i]["resolver"](context):
-            if "vars" not in context.keys():
-                context["vars"] = {}
             context["vars"][list(self.query_data.variables.keys())[i]] = res
             if len(self.query_data.variables.values()) > i + 1:
                 for r in self._get_variables(i+1, copy.deepcopy(context)):

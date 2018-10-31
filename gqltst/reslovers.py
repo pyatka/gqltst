@@ -20,7 +20,9 @@ def range_resolver(range=[]):
 
 def depend_resolver(key, value, match_range=[], un_match_range=[]):
     def func(context):
-        print(context)
+        if key not in context["vars"].keys():
+            raise Exception("Disturbed arguments order")
+
         if context["vars"][key] == value:
             for i in match_range:
                 yield i
