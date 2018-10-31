@@ -3,11 +3,11 @@ Framework for automatic GraphQL testing. The framework takes url of your GraphQL
  
 ![Example](example.png)
 
-# Installation
+## Installation
 
     pip3 install gqltst
     
-# Usage
+## Usage
 Prepare your schema
 ```python
     import gqltst
@@ -72,3 +72,14 @@ Start test with own parameter resolvers
     
     schema.test(args=args, validators=validators)
 ```
+
+## Depensencies
+- [Python HTTP Requests for Humans™](https://github.com/requests/requests) 
+
+## ToDo
+
+- Stability
+- Better test result view
+- Refactoring
+- Mutations support
+- Specific resolvers
