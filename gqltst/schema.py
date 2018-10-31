@@ -282,10 +282,13 @@ class Schema(object):
         for test in self.test_queries:
             test_query_path = ".".join(test.query_data.path)
             print("Test %s" % (test_query_path), end='\r', flush=True)
-            test_iteration = 1
+            test_iteration = 0
             failed_tests = 0
+            response_time = []
             for query, values in test.get_query(self.scalars, args=args, validators=validators):
+                test_iteration += 1
                 result = requests.get(self.url, params={"query": query})
+                response_time.append(result.elapsed.total_seconds())
                 if result.status_code == 200:
                     response_data = result.json()
                     errors = self.validate_response(response_data["data"], validators)
@@ -298,15 +301,15 @@ class Schema(object):
                         test_errors_save_data[test_query_path].append({
                             "values": values,
                             "query": query,
-                            "response": result,
+                            "response": result.text,
                             "errors": [str(r) for r in errors],
                         })
 
                     if failed_tests > 0:
-                        print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration), end='\r',
+                        print("Test %s (%s/%s) [%0.2fs] - FAIL" % (test_query_path, failed_tests, test_iteration, sum(response_time)/len(response_time)), end='\r',
                               flush=True)
                     else:
-                        print("Test %s (%s)" % (test_query_path, test_iteration), end='\r', flush=True)
+                        print("Test %s (0/%s) [%0.2fs]" % (test_query_path, test_iteration, sum(response_time)/len(response_time)), end='\r', flush=True)
                     #     print(query)
                     # print([str(r) for r in errors])
                 else:
@@ -321,18 +324,18 @@ class Schema(object):
                         "respose_code": result.status_code,
                     })
 
-                    print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration), end='\r',
+                    print("Test %s (%s/%s) [%0.2fs] - FAIL" % (test_query_path, failed_tests, test_iteration, sum(response_time)/len(response_time)), end='\r',
                           flush=True)
 
-                test_iteration += 1
-
             if failed_tests > 0:
-                print("Test %s (%s/%s) - FAIL" % (test_query_path, failed_tests, test_iteration))
+                print("Test %s (%s/%s) [average %0.2fs / total %0.2fs] - FAIL" % (test_query_path, test_iteration - failed_tests, test_iteration, sum(response_time)/len(response_time), sum(response_time)))
             else:
-                print("Test %s (%s/%s) - DONE" % (test_query_path, test_iteration, test_iteration))
+                print("Test %s (%s/%s) [average %0.2fs / total %0.2fs] - DONE" % (test_query_path, test_iteration, test_iteration, sum(response_time)/len(response_time), sum(response_time)))
 
         with open("result.json", "w") as rf:
             rf.write(json.dumps(test_errors_save_data))
+
+        print("Check results in result.json")
 
     def validate_response(self, response_data, validators):
         for key in response_data.keys():
