@@ -5,10 +5,11 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="gqltst",
-    version="0.0.4",
+    version="0.0.5",
     author="Andrey Mazur",
     author_email="pyatka.aag@gmail.com",
-    description="Framework for automatic GraphQL testing",
+    description="""Framework for automatic GraphQL testing. The framework takes url of your GraphQL endpoint,
+                    builds schema and generates http queries for testing.""",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/pyatka/gqltst",

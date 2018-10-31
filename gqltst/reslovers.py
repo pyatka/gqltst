@@ -20,6 +20,7 @@ def range_resolver(range=[]):
 
 def depend_resolver(key, value, match_range=[], un_match_range=[]):
     def func(context):
+        print(context)
         if context["vars"][key] == value:
             for i in match_range:
                 yield i
