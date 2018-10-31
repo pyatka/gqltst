@@ -4,6 +4,8 @@ import json
 from gqltst.query import TestQuery, QueryData
 from gqltst.types import SCALAR_TYPES, ValidationResult
 
+from collections import OrderedDict
+
 structure_query = """
 query IntrospectionQuery {
   __schema {
@@ -80,8 +82,8 @@ fragment TypeRef on __Type {
 class Node(object):
     def __init__(self, path=[]):
         self.path = path
-        self.fields = {}
-        self.args = {}
+        self.fields = OrderedDict()
+        self.args = OrderedDict()
         self.name = ""
         self.type = ""
         self.kind = ""
