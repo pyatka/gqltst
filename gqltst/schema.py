@@ -20,9 +20,10 @@ class QueryInfo(object):
         self.path.append(obj)
 
         key = [p.name for p in self.path]
-        self.variables[".".join(key)] = copy.deepcopy(obj.args)
-        for _, arg in self.variables[".".join(key)].items():
-            arg.resolver = arg.prepare_resolver(copy.deepcopy(key), self.resolvers)
+        if len(obj.args.keys()) > 0:
+            self.variables[".".join(key)] = copy.deepcopy(obj.args)
+            for _, arg in self.variables[".".join(key)].items():
+                arg.resolver = arg.prepare_resolver(copy.deepcopy(key), self.resolvers)
 
     def get_query(self):
         result_query = ""
@@ -162,14 +163,15 @@ class GqlArgument(GqlObject):
                         input_data[ifld.name] = self.prepare_resolver(ifld_path, resolvers, ifld.type)
 
                 resolver = input_object_resolver(input_data)
-            # else:
-            #     print(self.type)
+
+        if resolver is None:
+            raise Exception("NULL resolver %s.%s" % (".".join(path), self.name))
 
         return resolver
 
     def get_scalar_resolver(self, scalar_type):
         if scalar_type.name in SCALAR_TYPES.keys():
-            self.resolver = SCALAR_TYPES[scalar_type.name].resolve
+            return SCALAR_TYPES[scalar_type.name].resolve
         else:
             raise Exception("Unknown scalar %s" % scalar_type.name)
 
@@ -307,6 +309,21 @@ class GqlType(GqlObject):
         return output
 
 
+class TestProposition(object):
+    def __init__(self):
+        self.position = 0
+        self.values = OrderedDict()
+
+    def set_value(self, resolver_dict, value):
+        if resolver_dict["key"] not in self.values.keys():
+            self.values[resolver_dict["key"]] = OrderedDict()
+
+        self.values[resolver_dict["key"]][resolver_dict["name"]] = value
+
+    def __str__(self):
+        return " -> ".join([k for k in self.values.keys()])
+
+
 class Schema(object):
     def __init__(self, url, headers={}):
         self.url = url
@@ -333,3 +350,39 @@ class Schema(object):
         for key, obj in TYPES_CACHE["Query"].fields.items():
             for qi in obj.prepare_queries(resolvers):
                 self.queries.append(qi)
+
+    def calculate_query_values(self, resolvers_list={}, proposition=None):
+        if proposition is None:
+            resolver = resolvers_list[list(resolvers_list.keys())[0]]
+            proposition = TestProposition()
+        else:
+            resolver = resolvers_list[list(resolvers_list.keys())[proposition.position]]
+
+        result = []
+
+        for value in resolver["obj"].resolver(proposition):
+            new_proposition = copy.deepcopy(proposition)
+            new_proposition.set_value(resolver, value)
+            if len(resolvers_list) > new_proposition.position + 1:
+                new_proposition.position += 1
+                result.extend(self.calculate_query_values(resolvers_list, new_proposition))
+            else:
+                result.append(new_proposition)
+
+        return result
+
+    def test(self):
+        for query_info in self.queries:
+            resolvers_list = OrderedDict()
+            for key, var in query_info.variables.items():
+                for vname, v in var.items():
+                    resolvers_list["%s.%s" % (key, vname)] = {
+                        "key": key,
+                        "name": vname,
+                        "obj": v,
+                    }
+
+            if len(resolvers_list.keys()) > 0:
+                print([str(p) for p in self.calculate_query_values(resolvers_list)])
+            else:
+                print("!!!!!", query_info)
