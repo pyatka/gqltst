@@ -37,3 +37,18 @@ def days_ago_resolver(days):
         for r in [(now_date - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")]:
             yield r
     return func
+
+def enum_resolver(enum={}, is_list=False, non_null=False):
+    def func(context):
+        for i in enum.keys():
+            if is_list:
+                yield [i]
+            else:
+                yield i
+    return func
+
+def input_object_resolver(input_data):
+    def func(context):
+        yield 0
+
+    return func

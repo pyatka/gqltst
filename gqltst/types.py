@@ -4,9 +4,6 @@ from datetime import datetime, timedelta
 
 
 class BaseResolver(object):
-    def resolve(self, context):
-        pass
-
     def escape(self, value):
         pass
 
@@ -15,6 +12,7 @@ class BaseResolver(object):
 
 
 class StringResolver(BaseResolver):
+    @staticmethod
     def resolve(self, context):
         for r in ["1111a"]:
             yield r
@@ -30,6 +28,7 @@ class StringResolver(BaseResolver):
 
 
 class DateTimeResolver(BaseResolver):
+    @staticmethod
     def resolve(self, context):
         now_date = datetime.now()
         for r in [(now_date - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
@@ -47,6 +46,7 @@ class DateTimeResolver(BaseResolver):
 
 
 class IntResolver(BaseResolver):
+    @staticmethod
     def resolve(self, context):
         yield random.randint(1, 10)
 
@@ -63,6 +63,7 @@ class IntResolver(BaseResolver):
 
 
 class FloatResolver(BaseResolver):
+    @staticmethod
     def resolve(self, context):
         yield random.randint(1, 10)
 
@@ -77,6 +78,7 @@ class FloatResolver(BaseResolver):
 
 
 class BooleanResolver(BaseResolver):
+    @staticmethod
     def resolve(self, context):
         yield random.choice([True, False])
 
@@ -111,4 +113,5 @@ SCALAR_TYPES = {
     "Boolean": BooleanResolver,
     "Float": FloatResolver,
     "Int": IntResolver,
+    "ID": IntResolver,
 }
